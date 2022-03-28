@@ -285,12 +285,6 @@ function Component:_setup()
 		if IsInAncestorList() then
 			TryConstructComponent(instance)
 		end
-
-		task.defer(function()
-			if not IsInAncestorList() then
-				TryDeconstructComponent(instance)
-			end
-		end)
 	end
 
 	local function InstanceTagged(instance: Instance)
@@ -306,16 +300,19 @@ function Component:_setup()
 			watchHandle:Disconnect()
 			watchingInstances[instance] = nil
 		end
+
 		TryDeconstructComponent(instance)
 	end
 
-	self[KEY_TROVE]:Connect(CollectionService:GetInstanceAddedSignal(self.Tag), InstanceTagged)
-	self[KEY_TROVE]:Connect(CollectionService:GetInstanceRemovedSignal(self.Tag), InstanceUntagged)
+	task.defer(function()
+		self[KEY_TROVE]:Connect(CollectionService:GetInstanceAddedSignal(self.Tag), InstanceTagged)
+		self[KEY_TROVE]:Connect(CollectionService:GetInstanceRemovedSignal(self.Tag), InstanceUntagged)
 
-	local tagged = CollectionService:GetTagged(self.Tag)
-	for _, instance in ipairs(tagged) do
-		task.defer(InstanceTagged, instance)
-	end
+		local tagged = CollectionService:GetTagged(self.Tag)
+		for _, instance in ipairs(tagged) do
+			task.spawn(InstanceTagged, instance)
+		end
+	end)
 end
 
 function Component:GetAll(): table
