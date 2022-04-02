@@ -193,10 +193,11 @@ function Component:_instansiate(instance: Instance)
 	self[KEY_STARTED][instance] = Promise.new(function(resolve, reject)
 		self[KEY_CONSTRUCTED][instance]
 			:andThen(function(component)
-				Promise.defer(function(_resolve)
-					StartComponent(component)
-					_resolve()
-				end):andThen(resolve):catch(reject)
+				task.defer(function()
+					Promise.try(function()
+						StartComponent(component)
+					end):andThen(resolve):catch(reject)
+				end)
 			end)
 			:catch(reject)
 	end):catch(function(error)
@@ -339,19 +340,24 @@ function Component:GetComponent(componentClass)
 end
 
 function Component:WaitForInstance(instance: Instance, timeout: number?): table
-	local componentInstance = self:FromInstance(instance)
-	if componentInstance then
-		return Promise.resolve(componentInstance)
+	local promise = self[KEY_STARTED][instance]
+	if promise then
+		if promise:getStatus() ~= Promise.Status.Started then
+			local _, component = promise:await()
+			return component
+		end
 	end
+
+	local component
 	return Promise.fromEvent(self.Started, function(c)
 		local match = c.Instance == instance
 		if match then
-			componentInstance = c
+			component = c
 		end
 		return match
 	end)
 		:andThen(function()
-			return componentInstance
+			return component
 		end)
 		:timeout(if type(timeout) == "number" then timeout else DEFAULT_TIMEOUT)
 end
