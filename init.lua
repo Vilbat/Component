@@ -117,6 +117,7 @@ function Component.new(config: ComponentConfig)
 
 	customComponent.Tag = config.Tag
 	customComponent.Started = customComponent[KEY_TROVE]:Construct(Signal)
+	customComponent.Constructed = customComponent[KEY_TROVE]:Construct(Signal)
 	customComponent.Stopped = customComponent[KEY_TROVE]:Construct(Signal)
 	setmetatable(customComponent, Component)
 	customComponent:_setup()
@@ -187,18 +188,21 @@ function Component:_instansiate(instance: Instance)
 		InvokeExtensionFn(component, "Constructed")
 
 		table.insert(self[KEY_COMPONENTS], component)
+
 		resolve(component)
+
+		task.defer(function()
+			self.Constructed:Fire(component)
+		end)
 	end)
 
 	self[KEY_STARTED][instance] = Promise.new(function(resolve, reject)
 		self[KEY_CONSTRUCTED][instance]
 			:andThen(function(component)
-				task.defer(function()
-					Promise.try(function()
-						StartComponent(component)
-						return component
-					end):andThen(resolve):catch(reject)
-				end)
+				Promise.defer(function(_resolve)
+					StartComponent(component)
+					_resolve()
+				end):andThen(resolve):catch(reject)
 			end)
 			:catch(reject)
 	end):catch(function(error)
@@ -341,21 +345,19 @@ function Component:GetComponent(componentClass)
 end
 
 function Component:WaitForInstance(instance: Instance, timeout: number?): table
-	local promise = self[KEY_STARTED][instance]
-	if promise then
-		return promise
+	local componentInstance = self:FromInstance(instance)
+	if componentInstance then
+		return Promise.resolve(componentInstance)
 	end
-
-	local component
-	return Promise.fromEvent(self.Started, function(c)
+	return Promise.fromEvent(self.Constructed, function(c)
 		local match = c.Instance == instance
 		if match then
-			component = c
+			componentInstance = c
 		end
 		return match
 	end)
 		:andThen(function()
-			return component
+			return componentInstance
 		end)
 		:timeout(if type(timeout) == "number" then timeout else DEFAULT_TIMEOUT)
 end
