@@ -1,7 +1,7 @@
 [package]
 name = "vilbat/component"
 description = "Adaptation of sleitnicks component system"
-version = "0.1.6"
+version = "0.1.8"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 

@@ -196,6 +196,7 @@ function Component:_instansiate(instance: Instance)
 				task.defer(function()
 					Promise.try(function()
 						StartComponent(component)
+						return component
 					end):andThen(resolve):catch(reject)
 				end)
 			end)
@@ -342,10 +343,7 @@ end
 function Component:WaitForInstance(instance: Instance, timeout: number?): table
 	local promise = self[KEY_STARTED][instance]
 	if promise then
-		if promise:getStatus() ~= Promise.Status.Started then
-			local _, component = promise:await()
-			return component
-		end
+		return promise
 	end
 
 	local component
